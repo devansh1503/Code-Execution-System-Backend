@@ -19,3 +19,23 @@ services:
     depends_on:
       - rabbitmq
       - redis-server
+      - python
+      - java
+      - javascript
+      - cpp
+
+  python:
+    image: python:3.10-alpine
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  javascript:
+    image: node:18-alpine
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  java:
+    image: openjdk:17-alpine
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  cpp:
+    image: gcc
+    entrypoint: ["tail", "-f", "/dev/null"]
