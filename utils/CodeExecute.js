@@ -7,6 +7,7 @@ const path = require('path')
 const docker = new Docker()
 
 const execute = async(data)=>{
+    console.log(data+"Executing")
     try{
         data = JSON.parse(data);
         const result = await processCode(data.code, data.language, data.input);
@@ -28,7 +29,7 @@ const processCode = async( code, language, input ) => {
         const tempDir = path.join(__dirname, "temp", containerName);
 
         fs.mkdirSync(tempDir, { recursive: true });
-        fs.writeFileSync(path.join(tempDir, `script.${fileExtension}`), code);
+        fs.writeFileSync(path.join(tempDir, `Main.${fileExtension}`), code);
         fs.writeFileSync(path.join(tempDir, "input.txt"), input || "");
         try{
             const container = await docker.createContainer({
@@ -105,12 +106,12 @@ function getFileExtension(language) {
 
 function getExecutionCommand(language) {
     const commands = {
-      python: "python3 script.py < input.txt",
-      javascript: "node script.js < input.txt",
-      java: "javac script.java && java script < input.txt",
-      cpp: "g++ script.cpp -o script && ./script < input.txt",
+      python: "python3 Main.py < input.txt",
+      javascript: "node Main.js < input.txt",
+      java: "javac Main.java && java Main < input.txt",
+      cpp: "g++ Main.cpp -o Main && ./Main < input.txt",
     };
-    return commands[language] || "node script.js";
+    return commands[language] || "node Main.js";
 }
 
 module.exports = execute

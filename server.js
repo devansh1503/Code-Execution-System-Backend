@@ -3,8 +3,11 @@ const bodyParser = require("body-parser")
 const {v4:uuidv4} = require("uuid")
 const {sendMessage} = require("./utils/RabbitMQ")
 const client = require("./utils/Redis")
+const cors = require("cors")
 
 const app = express()
+
+app.use(cors())
 
 app.use(bodyParser.json())
 
@@ -25,7 +28,7 @@ app.post('/execute', async (req, res)=>{
 
     await sendMessage(data);
 
-    res.send(`http://localhost:3000/result/${jobId}`)
+    res.send(`http://localhost:4000/result/${jobId}`)
 })
 
 app.get('/result/:id', async (req, res)=>{
@@ -34,4 +37,4 @@ app.get('/result/:id', async (req, res)=>{
     res.send(JSON.parse(result))
 })
 
-app.listen(3000, ()=>console.log('http://localhost:3000/'))
+app.listen(4000, ()=>console.log('http://localhost:4000/'))

@@ -6,36 +6,35 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis-server:
     image: redis
+    container_name: redis-server
     ports:
       - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   server:
     build: .
     ports:
-      - 3000:3000
+      - 4000:4000
     depends_on:
-      - rabbitmq
-      - redis-server
-      - python
-      - java
-      - javascript
-      - cpp
-
-  python:
-    image: python:3.10-alpine
-    entrypoint: ["tail", "-f", "/dev/null"]
-
-  javascript:
-    image: node:18-alpine
-    entrypoint: ["tail", "-f", "/dev/null"]
-
-  java:
-    image: openjdk:17-alpine
-    entrypoint: ["tail", "-f", "/dev/null"]
-
-  cpp:
-    image: gcc
-    entrypoint: ["tail", "-f", "/dev/null"]
+      rabbitmq:
+        condition: service_healthy
+      redis-server:
+        condition: service_healthy
+    # image: docker:dind
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Allow access to Docker daemon
+      - ./utils/temp:/app/utils/temp
+    privileged: true
+    
