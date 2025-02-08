@@ -1,13 +1,9 @@
 const client = require('./Redis')
-const {exec} = require('child_process')
 const Docker = require('dockerode')
-const fs = require('fs')
-const path = require('path')
 
 const docker = new Docker()
 
 const execute = async(data)=>{
-    console.log(data+"Executing")
     try{
         data = JSON.parse(data);
         const result = await processCode(data.code, data.language, data.input);
@@ -22,27 +18,26 @@ const execute = async(data)=>{
 const processCode = async( code, language, input ) => {
     try{
         const baseImage = getBaseImage(language);
-        const fileExtension = getFileExtension(language);
+
         const executionCommand = getExecutionCommand(language);
 
         const containerName = `code-runner-${Date.now()}`
-        const tempDir = path.join(__dirname, "temp", containerName);
 
-        fs.mkdirSync(tempDir, { recursive: true });
-        fs.writeFileSync(path.join(tempDir, `Main.${fileExtension}`), code);
-        fs.writeFileSync(path.join(tempDir, "input.txt"), input || "");
         try{
             const container = await docker.createContainer({
                 Image: baseImage,
                 name: containerName,
-                AttachStdin: false,
                 AttachStdout: true,
+                AttachStderr: true,
+                Env: [`CODE=${code}`, `INPUT=${input}`],
                 HostConfig: {
                     Memory: 128 * 1024 * 1024, //128MB
                     CpuQuota: 50000,
-                    Binds: [`${tempDir}:/app`]
+                    PidsLimit: 50, //Handles Fork Bombs
+                    CpuPeriod: 100000, //Time limit 
+                    MemorySwap: 128 * 1024 * 1024, //Disable Swap
                 },
-                Cmd: ["sh", "-c", `cd /app && ${executionCommand}`]
+                Cmd: ["sh", "-c", executionCommand]
             })
 
             await container.start();
@@ -59,7 +54,6 @@ const processCode = async( code, language, input ) => {
             await container.wait()
 
             await container.remove()
-            fs.rmSync(tempDir, {recursive: true, force: true})
             return { status: "success", output}
         }
         catch(error){
@@ -73,13 +67,11 @@ const processCode = async( code, language, input ) => {
             catch{
                 console.log("Container does not exist")
             }
-            fs.rmSync(tempDir, {recursive: true, force: true})
             return { status: "error", output:error.message}
         }
     }
     catch(error){
         console.log(error)
-        fs.rmSync(tempDir, {recursive: true, force: true})
         return { status: "error", output:error.message}
     }
 }
@@ -94,24 +86,22 @@ function getBaseImage(language) {
     return images[language] || "node:18-alpine";
 }
 
-function getFileExtension(language) {
-    const extensions = {
-      python: "py",
-      javascript: "js",
-      java: "java",
-      cpp: "cpp",
-    };
-    return extensions[language] || "txt";
-}
-
 function getExecutionCommand(language) {
     const commands = {
-      python: "python3 Main.py < input.txt",
-      javascript: "node Main.js < input.txt",
-      java: "javac Main.java && java Main < input.txt",
-      cpp: "g++ Main.cpp -o Main && ./Main < input.txt",
+    python: `echo "$INPUT" | python3 -c "$CODE"`,
+    javascript: `echo "$INPUT" | node -e "$CODE"`,
+    java: `
+        echo "$CODE" > Main.java &&
+        javac Main.java &&
+        echo "$INPUT" | java Main
+        `,
+    cpp: `
+        echo "$CODE" > Main.cpp &&
+        g++ Main.cpp -o Main &&
+        echo "$INPUT" | ./Main
+        `,
     };
-    return commands[language] || "node Main.js";
+    return commands[language] || `echo "$INPUT" | node -e "$CODE"`;
 }
 
 module.exports = execute
